@@ -1,3 +1,4 @@
+import data.CompressedSaveFileBody
 import data.SaveFileHeader
 import kotlinx.cli.ArgParser
 import kotlinx.cli.ArgType
@@ -5,6 +6,7 @@ import kotlinx.cli.required
 import java.io.DataInputStream
 import java.io.File
 import java.io.FileInputStream
+import java.nio.ByteBuffer
 
 fun main(args: Array<String>) {
     val argParser = ArgParser("Satisfactory save parser")
@@ -22,4 +24,11 @@ fun main(args: Array<String>) {
 
     val saveParser = SaveFileParser(input)
     val saveHeader = SaveFileHeader.parseHeader(saveParser)
+    val compressedBodies: MutableList<CompressedSaveFileBody> = mutableListOf()
+
+    while (input.available() > 0) {
+        compressedBodies.add(
+            CompressedSaveFileBody.parseCompressedBody(saveParser)
+        )
+    }
 }

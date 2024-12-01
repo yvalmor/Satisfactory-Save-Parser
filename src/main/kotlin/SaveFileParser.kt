@@ -1,3 +1,4 @@
+import data.SaveFileHeader
 import mu.KotlinLogging
 import java.io.InputStream
 import java.nio.ByteBuffer
@@ -5,7 +6,7 @@ import java.nio.ByteOrder
 import java.nio.charset.StandardCharsets
 
 class SaveFileParser constructor(private val input: InputStream) {
-    private val logger = KotlinLogging.logger(javaClass.name)
+    private val logger = KotlinLogging.logger(SaveFileParser::class.java.name)
 
     init {
         logger.info { "Initializing parser" }
@@ -37,6 +38,21 @@ class SaveFileParser constructor(private val input: InputStream) {
     }
 
     /**
+     * Parses four bytes in little-endian order that represents an unsigned integer
+     * between 0 and 4,294,967,295 and returns it
+     */
+    fun parseUInt32(): UInt {
+        val bytes = ByteBuffer.allocate(4).order(ByteOrder.LITTLE_ENDIAN)
+        val readBytes = input.readNBytes(4)
+
+        bytes.put(readBytes)
+        bytes.position(0)
+        val returnValue = bytes.getInt().toUInt()
+        logger.debug { "Parsing int $returnValue" }
+        return returnValue
+    }
+
+    /**
      * Parses four bytes in little-endian order that represents a signed integer
      * between -9,223,372,036,854,775,80 and 9,223,372,036,854,775,807 and returns it
      */
@@ -48,6 +64,21 @@ class SaveFileParser constructor(private val input: InputStream) {
         bytes.position(0)
         val returnValue = bytes.getLong()
         logger.debug { "Parsing long $returnValue" }
+        return returnValue
+    }
+
+    /**
+     * Parses four bytes in little-endian order that represents an unsigned integer
+     * between 0 and 18,446,744,073,709,551,615 and returns it
+     */
+    fun parseUInt64(): ULong {
+        val bytes = ByteBuffer.allocate(8).order(ByteOrder.LITTLE_ENDIAN)
+        val readBytes = input.readNBytes(8)
+
+        bytes.put(readBytes)
+        bytes.position(0)
+        val returnValue = bytes.getLong().toULong()
+        logger.debug { "Parsing int $returnValue" }
         return returnValue
     }
 
@@ -126,5 +157,23 @@ class SaveFileParser constructor(private val input: InputStream) {
         val returnValue = StandardCharsets.UTF_8.decode(readBytes).toString()
         logger.debug { "Parsing fix string '$returnValue'" }
         return returnValue
+    }
+
+    fun parseCompressedBytes(size: ULong): List<Byte> {
+        var compressedSize: ULong = size
+        val buffers: MutableList<ByteArray> = mutableListOf()
+
+        while (compressedSize > 0u) {
+            var bufferSize: Int = Int.SIZE_BYTES
+            if (compressedSize < bufferSize.toUInt())
+                bufferSize = compressedSize.toInt()
+
+            val buffer = input.readNBytes(bufferSize)
+            buffers.add(buffer)
+
+            compressedSize -= bufferSize.toUInt()
+        }
+
+        return buffers.flatMap(ByteArray::asList)
     }
 }
