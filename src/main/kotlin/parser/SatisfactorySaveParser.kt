@@ -1,12 +1,13 @@
-import data.SaveFileHeader
+package parser
+
 import mu.KotlinLogging
 import java.io.InputStream
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.nio.charset.StandardCharsets
 
-class SaveFileParser constructor(private val input: InputStream) {
-    private val logger = KotlinLogging.logger(SaveFileParser::class.java.name)
+abstract class SatisfactorySaveParser(private val input: InputStream) {
+    protected val logger = KotlinLogging.logger(javaClass.name)
 
     init {
         logger.info { "Initializing parser" }
@@ -157,23 +158,5 @@ class SaveFileParser constructor(private val input: InputStream) {
         val returnValue = StandardCharsets.UTF_8.decode(readBytes).toString()
         logger.debug { "Parsing fix string '$returnValue'" }
         return returnValue
-    }
-
-    fun parseCompressedBytes(size: ULong): List<Byte> {
-        var compressedSize: ULong = size
-        val buffers: MutableList<ByteArray> = mutableListOf()
-
-        while (compressedSize > 0u) {
-            var bufferSize: Int = Int.SIZE_BYTES
-            if (compressedSize < bufferSize.toUInt())
-                bufferSize = compressedSize.toInt()
-
-            val buffer = input.readNBytes(bufferSize)
-            buffers.add(buffer)
-
-            compressedSize -= bufferSize.toUInt()
-        }
-
-        return buffers.flatMap(ByteArray::asList)
     }
 }

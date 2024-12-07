@@ -1,6 +1,6 @@
 package data
 
-import SaveFileParser
+import parser.SaveFileParser
 import mu.KotlinLogging
 
 class CompressedSaveFileBody private constructor(

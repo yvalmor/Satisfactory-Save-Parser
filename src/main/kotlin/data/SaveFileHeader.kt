@@ -1,6 +1,6 @@
 package data
 
-import SaveFileParser
+import parser.SaveFileParser
 import mu.KotlinLogging
 
 data class SaveFileHeader private constructor(
