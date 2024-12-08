@@ -4,7 +4,7 @@ import data.property.Property
 import data.property.PropertyHeader
 
 typealias PropertyList = List<Pair<PropertyHeader, Property>>
-private typealias Vector3<T> = Triple<T, T, T>
+typealias Vector3<T> = Triple<T, T, T>
 
 data class SaveFileBody(
     val size: ULong,
@@ -21,6 +21,7 @@ data class LevelGroupingGrid(
 data class Level(
     val name: String,
     val objectHeaders: List<ObjectHeader>,
+    val collectables: List<ObjectReference>,
     val objectBodies: List<ObjectBody>,
 )
 
@@ -62,7 +63,7 @@ data class ActorObject(
     val parentObjectReference: ObjectReference,
     val components: List<ObjectReference>,
     override val properties: PropertyList,
-    val trailingBytes: List<TrailingBytes>
+    val trailingBytes: TrailingBytes?
 ) : ObjectBody {
     interface TrailingBytes
 
@@ -87,17 +88,17 @@ data class ActorObject(
         val components: List<LightweightBuildableSubsystemTrailingBytesComponent>
     )
 
-    data class ConveyorChainActorElement(
+    data class ConveyorChainElement(
         val chainActor: ObjectReference,
         val belt: ObjectReference,
-        val elements: Vector3<Vector3<ULong>>,
+        val elements: List<Vector3<Vector3<ULong>>>,
         val beltIndex: UInt,
         val items: List<Pair<String, UInt>> // name, count
     )
 
     data class ConveyorTrailingBytes(val elements: List<ConveyorTrailingBytesElement>) : TrailingBytes
     data class GameModeTrailingBytes(val references: List<ObjectReference>) : TrailingBytes
-    data class PlayerStateTrailingBytes(val isEmpty: Boolean, val isSteam: Boolean, val data: List<Byte>) :
+    data class PlayerStateTrailingBytes(val isEmpty: Boolean, val data: List<Byte>, val isSteam: Boolean? = null) :
         TrailingBytes
 
     data class CircuitSubsystemTrailingBytes(val elements: List<CircuitSubsystemTrailingBytesElement>) : TrailingBytes
@@ -106,11 +107,11 @@ data class ActorObject(
     data class LightweightBuildableSubsystemTrailingBytes(
         val elements: List<LightweightBuildableSubsystemTrailingBytesElement>
     ) : TrailingBytes
-    data class ConveyorChainActorTrailingBytes(
+    data class ConveyorChainTrailingBytes(
         val startingBelt: ObjectReference,
         val endingBelt: ObjectReference,
         val beltSize: UInt,
-        val beltElements: List<ConveyorChainActorElement>,
+        val beltElements: List<ConveyorChainElement>,
     ) : TrailingBytes
 }
 

@@ -70,5 +70,5 @@ fun isObjectVehicle(objectName: String) = objectName in vehicleNames
 fun isObjectConveyorChainActor(objectName: String) = objectName in conveyorChainActor
 fun isObjectFGComponent(objectName: String) = objectName in FGComponentNames
 fun isObjectPlayerState(objectName: String) = objectName == playerStateName
-fun isObjectCircuitSubsystemName(objectName: String) = objectName == circuitSubsystemName
+fun isObjectCircuitSubsystem(objectName: String) = objectName == circuitSubsystemName
 fun isObjectLightweightBuildableSubsystem(objectName: String) = objectName == lightweightBuildableSubsystem

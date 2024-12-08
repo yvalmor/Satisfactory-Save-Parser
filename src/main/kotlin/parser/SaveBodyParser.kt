@@ -5,7 +5,6 @@ import data.property.*
 import data.typed_data.*
 import java.io.InputStream
 import java.security.InvalidParameterException
-import kotlin.reflect.typeOf
 
 class SaveBodyParser(private val input: InputStream) : SatisfactorySaveParser(input) {
     fun parseSaveBody(): SaveFileBody {
@@ -83,8 +82,9 @@ class SaveBodyParser(private val input: InputStream) : SatisfactorySaveParser(in
             objectHeaders.add(parseObjectHeader())
 
         val collectableCount = parseUInt32()
+        val collectables: MutableList<ObjectReference> = mutableListOf()
         for (i in 1u..collectableCount)
-            parseObjectReference()
+            collectables.add(parseObjectReference())
 
         parseUInt64() // Object size
         val objectCount = parseUInt32()
@@ -99,6 +99,7 @@ class SaveBodyParser(private val input: InputStream) : SatisfactorySaveParser(in
         return Level(
             name,
             objectHeaders,
+            collectables,
             objectBodies,
         )
     }
@@ -177,9 +178,17 @@ class SaveBodyParser(private val input: InputStream) : SatisfactorySaveParser(in
             components.add(parseObjectReference())
 
         val properties = parsePropertyList()
-        val trailingBytes: MutableList<Byte> = mutableListOf()
+        val trailingBytes = parseActorObjectTrailingBytes(header.path)
 
-        TODO()
+        return ActorObject(
+            saveVersion,
+            flag,
+            size,
+            parentReference,
+            components,
+            properties,
+            trailingBytes
+        )
     }
 
     private fun parseComponentObject(header: ComponentHeader): ComponentObject {
@@ -191,8 +200,14 @@ class SaveBodyParser(private val input: InputStream) : SatisfactorySaveParser(in
         val properties = parsePropertyList()
 
         parseUInt32()
+        parseComponentObjectTrailingBytes(header.path)
 
-        TODO()
+        return ComponentObject(
+            saveVersion,
+            flag,
+            size,
+            properties,
+        )
     }
 
     private fun parsePropertyList(): List<Pair<PropertyHeader, Property>> {
@@ -488,7 +503,7 @@ class SaveBodyParser(private val input: InputStream) : SatisfactorySaveParser(in
     }
 
     private fun parseTypedData(type: String): TypedData {
-        "" +logger.info { "Parsing TypedData $type" }
+        logger.info { "Parsing TypedData $type" }
 
         return when (type) {
             "Box" -> parseBoxData()
@@ -563,13 +578,221 @@ class SaveBodyParser(private val input: InputStream) : SatisfactorySaveParser(in
         )
     }
 
-    private fun parseActorObjectTrailingBytes(objectName: String) {
-        when {
-            isObjectConveyorBelt(objectName) -> {}
-            else -> throw Error()
+    private fun parseActorObjectTrailingBytes(objectName: String): ActorObject.TrailingBytes? {
+        return when {
+            isObjectConveyorBelt(objectName) -> parseConveyorBeltActor()
+            isObjectGameMode(objectName) -> parseGameModeActor()
+            isObjectPlayerState(objectName) -> parsePlayerStateActor()
+            isObjectCircuitSubsystem(objectName) -> parseCircuitSubsystemActor()
+            isObjectPowerLine(objectName) -> parsePowerLineActor()
+            isObjectVehicle(objectName) -> parseVehicleActor()
+            isObjectLightweightBuildableSubsystem(objectName) -> parseLightweightBuildableSubsystemActor()
+            isObjectConveyorChainActor(objectName) -> parseConveyorChainActor()
+            else -> null
         }
     }
 
+    private fun parseConveyorBeltActor(): ActorObject.ConveyorTrailingBytes {
+        val count = parseUInt32()
+        val elements: MutableList<ActorObject.ConveyorTrailingBytesElement> = mutableListOf()
+
+        for (i in 1u..count) {
+            val length = parseUInt32()
+            val name = parseString()
+
+            parseString()
+            parseString()
+
+            elements.add(ActorObject.ConveyorTrailingBytesElement(length, name, parseFloat()))
+        }
+
+        return ActorObject.ConveyorTrailingBytes(elements)
+    }
+
+    private fun parseGameModeActor(): ActorObject.GameModeTrailingBytes {
+        val count = parseUInt32()
+        val references: MutableList<ObjectReference> = mutableListOf()
+
+        for (i in 1u..count)
+            references.add(parseObjectReference())
+
+        return ActorObject.GameModeTrailingBytes(references)
+    }
+
+    private fun parsePlayerStateActor(): ActorObject.PlayerStateTrailingBytes {
+        val formatting = parseByte()
+
+        if (formatting == 3)
+            return ActorObject.PlayerStateTrailingBytes(true, listOf())
+
+        if (formatting != 241)
+            throw InvalidParameterException("Player state formatting is not recognised: $formatting")
+
+        val isSteam = parseByte() == 6
+        val size = parseUInt32()
+        val data = input.readNBytes(size.toInt())
+
+        return ActorObject.PlayerStateTrailingBytes(false, data.toList(), isSteam)
+    }
+
+    private fun parseCircuitSubsystemActor(): ActorObject.CircuitSubsystemTrailingBytes {
+        val count = parseUInt32()
+        val elements: MutableList<ActorObject.CircuitSubsystemTrailingBytesElement> = mutableListOf()
+
+        for (i in 1u..count) {
+            elements.add(
+                ActorObject.CircuitSubsystemTrailingBytesElement(
+                    parseUInt32(),
+                    parseObjectReference(),
+                )
+            )
+        }
+
+        return ActorObject.CircuitSubsystemTrailingBytes(elements)
+    }
+
+    private fun parsePowerLineActor(): ActorObject.PowerLineTrailingBytes {
+        return ActorObject.PowerLineTrailingBytes(
+            Pair(
+                parseObjectReference(),
+                parseObjectReference(),
+            )
+        )
+    }
+
+    private fun parseVehicleActor(): ActorObject.VehicleTrailingBytes {
+        val count = parseUInt32()
+        val elements: MutableList<ActorObject.VehicleTrailingBytesElement> = mutableListOf()
+        val elementByteSize = 105 // Fixed data size
+
+        for (i in 1u..count) {
+            elements.add(
+                ActorObject.VehicleTrailingBytesElement(
+                    parseUInt32(),
+                    input.readNBytes(elementByteSize).toList(),
+                )
+            )
+        }
+
+        return ActorObject.VehicleTrailingBytes(elements)
+    }
+
+    private fun parseLightweightBuildableSubsystemActor(): ActorObject.LightweightBuildableSubsystemTrailingBytes {
+        val count = parseUInt32()
+        val elements: MutableList<ActorObject.LightweightBuildableSubsystemTrailingBytesElement> = mutableListOf()
+
+        for (i in 1u..count)
+            elements.add(parseLightweightBuildableSubsystemElement())
+
+        return ActorObject.LightweightBuildableSubsystemTrailingBytes(elements)
+    }
+
+    private fun parseLightweightBuildableSubsystemElement(): ActorObject.LightweightBuildableSubsystemTrailingBytesElement {
+        parseUInt32()
+        val name = parseString()
+        val count = parseUInt32()
+        val components: MutableList<ActorObject.LightweightBuildableSubsystemTrailingBytesComponent> = mutableListOf()
+
+        for (i in 1u..count) {
+            val rotationQuaternion = listOf(parseDouble(), parseDouble(), parseDouble(), parseDouble())
+            val position = Triple(parseDouble(), parseDouble(), parseDouble())
+            val scale = Triple(parseDouble(), parseDouble(), parseDouble())
+
+            parseUInt32()
+
+            val swatch = parseString()
+
+            parseUInt32()
+            parseUInt32()
+            parseUInt32()
+
+            val patternDescriptionNumber = parseString()
+
+            parseUInt32()
+            parseUInt32()
+
+            val primaryColor = listOf(parseFloat(), parseFloat(), parseFloat(), parseFloat())
+            val secondaryColor = listOf(parseFloat(), parseFloat(), parseFloat(), parseFloat())
+
+            parseUInt32()
+
+            val size = parseUInt32()
+            val data = input.readNBytes(size.toInt()).toList()
+
+            parseUInt32()
+            parseByte()
+
+            val recipe = parseString()
+            val blueprintProxy = parseObjectReference()
+
+            components.add(
+                ActorObject.LightweightBuildableSubsystemTrailingBytesComponent(
+                    rotationQuaternion,
+                    position,
+                    scale,
+                    swatch,
+                    patternDescriptionNumber,
+                    primaryColor,
+                    secondaryColor,
+                    data,
+                    recipe,
+                    blueprintProxy
+                )
+            )
+        }
+
+        return ActorObject.LightweightBuildableSubsystemTrailingBytesElement(
+            name,
+            components
+        )
+    }
+
+    private fun parseConveyorChainActor(): ActorObject.ConveyorChainTrailingBytes {
+        val startingBelt = parseObjectReference()
+        val endingBelt = parseObjectReference()
+        val count = parseUInt32()
+        val belts: MutableList<ActorObject.ConveyorChainElement> = mutableListOf()
+
+        for (i in 1u..count) {
+            val chainActor = parseObjectReference()
+            val belt = parseObjectReference()
+            val elementCount = parseUInt32()
+            val elements: MutableList<Vector3<Vector3<ULong>>> = mutableListOf()
+
+            for (j in 1u..elementCount)
+                elements.add(Triple(
+                    Triple(parseUInt64(), parseUInt64(), parseUInt64()),
+                    Triple(parseUInt64(), parseUInt64(), parseUInt64()),
+                    Triple(parseUInt64(), parseUInt64(), parseUInt64()),
+                ))
+
+            parseUInt32()
+            parseUInt32()
+            parseUInt32()
+            parseInt()
+            parseInt()
+
+            val beltIndex = parseUInt32()
+
+            parseUInt32()
+            parseInt()
+            parseInt()
+            parseInt()
+
+            val itemCount = parseUInt32()
+            val items: MutableList<Pair<String, UInt>> = mutableListOf()
+
+            for (j in 1u..itemCount)
+                items.add(Pair(parseString(), parseUInt32()))
+
+            belts.add(ActorObject.ConveyorChainElement(chainActor, belt, elements, beltIndex, items))
+        }
+
+        return ActorObject.ConveyorChainTrailingBytes(startingBelt, endingBelt, count, belts)
+    }
+
     private fun parseComponentObjectTrailingBytes(objectName: String) {
+        if (isObjectFGComponent(objectName))
+            parseUInt32()
     }
 }
