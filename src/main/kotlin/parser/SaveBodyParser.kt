@@ -90,7 +90,7 @@ class SaveBodyParser(private val input: InputStream) : SatisfactorySaveParser(in
         val objectCount = parseUInt32()
         val objectBodies: MutableList<ObjectBody> = mutableListOf()
         for (i in 1u..objectCount)
-            objectBodies.add(parseObjectBody(objectHeaders[i.toInt()]))
+            objectBodies.add(parseObjectBody(objectHeaders[i.toInt() - 1]))
 
         val secondCollectableCount = parseUInt32()
         for (i in 1u..secondCollectableCount)
@@ -444,10 +444,43 @@ class SaveBodyParser(private val input: InputStream) : SatisfactorySaveParser(in
     private fun parseMapProperty(
         size: UInt,
         index: UInt
-    ): MapProperty<MapProperty.MapPropertyKey, MapProperty.MapPropertyValue> {
+    ): MapProperty {
         logger.info { "Parsing MapProperty" }
 
-        TODO()
+        val keyType = parseString()
+        val valueType = parseString()
+
+        parseByte()
+
+        val modeType = parseUInt32()
+        val count = parseUInt32()
+
+        val map: MutableMap<MapProperty.MapPropertyKey, MapProperty.MapPropertyValue> = mutableMapOf()
+
+        for (i in 1u..count) {
+            map[parseMapPropertyKey(keyType)] = parseMapPropertyValue(valueType)
+        }
+
+        return MapProperty(size, index, keyType, valueType, modeType, map)
+    }
+
+    private fun parseMapPropertyKey(keyType: String) : MapProperty.MapPropertyKey {
+        return when (keyType) {
+            "ObjectProperty" -> MapProperty.ObjectMapKey(parseObjectReference())
+            "IntProperty" -> MapProperty.IntMapKey(parseInt())
+            "StructProperty" -> MapProperty.StructMapKey(Triple(parseInt(), parseInt(), parseInt()))
+            else -> throw InvalidParameterException("$keyType is not recognised as a possible map property key")
+        }
+    }
+
+    private fun parseMapPropertyValue(valueType: String) : MapProperty.MapPropertyValue {
+        return when (valueType) {
+            "ByteProperty" -> MapProperty.ByteMapValue(parseByte())
+            "IntProperty" -> MapProperty.IntMapValue(parseInt())
+            "Int64Property" -> MapProperty.Int64MapValue(parseLong())
+            "StructProperty" -> MapProperty.StructMapValue(parsePropertyList())
+            else -> throw InvalidParameterException("$valueType is not recognised as a possible map property value")
+        }
     }
 
     private fun parseNameProperty(size: UInt, index: UInt): NameProperty {
@@ -474,7 +507,27 @@ class SaveBodyParser(private val input: InputStream) : SatisfactorySaveParser(in
     private fun parseSetProperty(size: UInt, index: UInt): SetProperty<SetProperty.SetPropertyElement> {
         logger.info { "Parsing SetProperty" }
 
-        TODO()
+        val type = parseString()
+
+        parseByte()
+        parseUInt32()
+
+        val count = parseUInt32()
+        val elements: MutableList<SetProperty.SetPropertyElement> = mutableListOf()
+
+        for (i in 1u..count)
+            elements.add(parseSetPropertyElement(type))
+
+        return SetProperty(size, index, type, elements)
+    }
+
+    private fun parseSetPropertyElement(elementType: String): SetProperty.SetPropertyElement {
+        return when (elementType) {
+            "UInt32Property" -> SetProperty.UInt32SetElement(parseUInt32())
+            "StructProperty" -> SetProperty.StructSetElement(Pair(parseUInt64(), parseUInt64()))
+            "ObjectProperty" -> SetProperty.ObjectReferenceSetElement(parseObjectReference())
+            else -> throw InvalidParameterException("$elementType is not recognised as a possible set property element")
+        }
     }
 
     private fun parseStrProperty(size: UInt, index: UInt): StrProperty {
@@ -487,19 +540,27 @@ class SaveBodyParser(private val input: InputStream) : SatisfactorySaveParser(in
     private fun parseStructProperty(size: UInt, index: UInt): StructProperty {
         logger.info { "Parsing StructProperty" }
 
-        TODO()
+        val type = parseString()
+
+        parseLong()
+        parseLong()
+        parseByte()
+
+        val data = parseTypedData(type)
+        return StructProperty(size, index, type, data)
     }
 
     private fun parseTextProperty(size: UInt, index: UInt): TextProperty {
         logger.info { "Parsing TextProperty" }
 
-        TODO()
-    }
+        parseByte()
 
-    private fun parseTypedData(): TypedData {
-        logger.info { "Parsing TypedData" }
+        val flags = parseUInt32()
+        val historyType = parseByte()
+        val textCultureInvariant = parseUInt32() == 1u
+        val value = parseString()
 
-        TODO()
+        return TextProperty(size, index, flags, historyType, textCultureInvariant, value)
     }
 
     private fun parseTypedData(type: String): TypedData {
@@ -588,7 +649,10 @@ class SaveBodyParser(private val input: InputStream) : SatisfactorySaveParser(in
             isObjectVehicle(objectName) -> parseVehicleActor()
             isObjectLightweightBuildableSubsystem(objectName) -> parseLightweightBuildableSubsystemActor()
             isObjectConveyorChainActor(objectName) -> parseConveyorChainActor()
-            else -> null
+            else -> {
+                parseUInt32()
+                return null
+            }
         }
     }
 

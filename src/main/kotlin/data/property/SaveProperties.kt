@@ -1,6 +1,7 @@
 package data.property
 
 import data.ObjectReference
+import data.PropertyList
 import data.typed_data.TypedData
 
 data class PropertyHeader(
@@ -30,9 +31,6 @@ data class ArrayProperty(
         val elementType: String,
         val data: TypedData,
     ): ArrayPropertyElement
-
-    val elementsSize: Int
-        get() = elements.size
 }
 
 data class BoolProperty(
@@ -92,13 +90,13 @@ data class Int64Property(
     val value: Long,
 ) : Property
 
-data class MapProperty<K: MapProperty.MapPropertyKey, V: MapProperty.MapPropertyValue>(
+data class MapProperty(
     override val size: UInt,
     override val index: UInt,
     val keyType: String,
     val valueType: String,
     val mode: UInt,
-    val elements: Map<K, V>
+    val elements: Map<MapPropertyKey, MapPropertyValue>
 ) : Property {
     interface MapPropertyKey
     interface MapPropertyValue
@@ -109,11 +107,8 @@ data class MapProperty<K: MapProperty.MapPropertyKey, V: MapProperty.MapProperty
 
     data class ByteMapValue(val value: Int) : MapPropertyValue
     data class IntMapValue(val value: Int) : MapPropertyValue
-    data class Int64MapValue(val value: Int) : MapPropertyValue
-    data class StructMapValue(val value: List<Property>) : MapPropertyValue
-
-    val elementsSize: Int
-        get() = elements.size
+    data class Int64MapValue(val value: Long) : MapPropertyValue
+    data class StructMapValue(val value: PropertyList) : MapPropertyValue
 }
 
 data class NameProperty(
@@ -143,12 +138,9 @@ data class SetProperty<T: SetProperty.SetPropertyElement>(
 ) : Property {
     interface SetPropertyElement
 
-    data class UInt32SetElement(val value: UInt)
-    data class StructSetElement(val value: Pair<ULong, ULong>)
-    data class ObjectReferenceSetElement(val value: ObjectReference)
-
-    val elementSize: Int
-        get() = elements.size
+    data class UInt32SetElement(val value: UInt) : SetPropertyElement
+    data class StructSetElement(val value: Pair<ULong, ULong>) : SetPropertyElement
+    data class ObjectReferenceSetElement(val value: ObjectReference) : SetPropertyElement
 }
 
 data class StrProperty(
@@ -161,8 +153,7 @@ data class StructProperty(
     override val size: UInt,
     override val index: UInt,
     val type: String,
-    val data: TypedData?,
-    val properties: List<Property>?,
+    val data: TypedData,
 ) : Property
 
 data class TextProperty(
