@@ -1,7 +1,5 @@
 package data
 
-data class SaveFile(val header: SaveFileHeader, val compressedBody: List<CompressedSaveFileBody>)
-
 data class SaveFileHeader(
     val headerVersion: Int,
     val saveVersion: Int,

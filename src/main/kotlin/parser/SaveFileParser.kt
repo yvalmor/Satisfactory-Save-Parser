@@ -1,7 +1,6 @@
 package parser
 
 import data.CompressedSaveFileBody
-import data.SaveFile
 import data.SaveFileHeader
 import java.io.InputStream
 

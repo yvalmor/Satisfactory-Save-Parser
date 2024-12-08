@@ -1,4 +1,3 @@
-import data.SaveFile
 import data.SaveFileBody
 import data.SaveFileHeader
 import kotlinx.cli.ArgParser
