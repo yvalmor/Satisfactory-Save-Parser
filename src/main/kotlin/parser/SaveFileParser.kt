@@ -6,22 +6,7 @@ import data.SaveFileHeader
 import java.io.InputStream
 
 class SaveFileParser(private val input: InputStream) : SatisfactorySaveParser(input) {
-    fun parseSaveFile(): SaveFile {
-        logger.info { "Parsing save file" }
-
-        val header = parseHeader()
-        val bodies: MutableList<CompressedSaveFileBody> = mutableListOf()
-
-        while (input.available() > 0)
-            bodies.add(parseCompressedBody())
-
-        return SaveFile(
-            header,
-            bodies
-        )
-    }
-
-    private fun parseHeader() : SaveFileHeader {
+    fun parseHeader() : SaveFileHeader {
         logger.info { "Parsing save header" }
 
         val headerVersion = parseInt()
@@ -63,8 +48,11 @@ class SaveFileParser(private val input: InputStream) : SatisfactorySaveParser(in
         )
     }
 
-    private fun parseCompressedBody(): CompressedSaveFileBody {
+    fun parseCompressedBody(): CompressedSaveFileBody? {
         logger.info { "Parsing compressed body" }
+
+        if (input.available() == 0)
+            return null
 
         val uePackageSignature: UInt = parseUInt32()
         parseUInt32()

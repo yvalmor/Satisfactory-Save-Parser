@@ -197,7 +197,10 @@ class SaveBodyParser(private val input: InputStream) : SatisfactorySaveParser(in
         val saveVersion = parseUInt32()
         val flag = parseUInt32() == 1u
         val size = parseUInt32()
-        val properties = parsePropertyList()
+
+        val properties = if (size > 0u)
+            parsePropertyList()
+        else listOf()
 
         parseUInt32()
         parseComponentObjectTrailingBytes(header.path)
@@ -332,7 +335,11 @@ class SaveBodyParser(private val input: InputStream) : SatisfactorySaveParser(in
 
         val elementType = parseString()
 
-        for (i in 1..4)
+        var paddingSize = 4
+        if (elementType == "")
+            paddingSize = 1
+
+        for (i in 1..paddingSize)
             parseUInt32() // Padding
         parseByte() // Padding
 
@@ -464,7 +471,7 @@ class SaveBodyParser(private val input: InputStream) : SatisfactorySaveParser(in
         return MapProperty(size, index, keyType, valueType, modeType, map)
     }
 
-    private fun parseMapPropertyKey(keyType: String) : MapProperty.MapPropertyKey {
+    private fun parseMapPropertyKey(keyType: String): MapProperty.MapPropertyKey {
         return when (keyType) {
             "ObjectProperty" -> MapProperty.ObjectMapKey(parseObjectReference())
             "IntProperty" -> MapProperty.IntMapKey(parseInt())
@@ -473,7 +480,7 @@ class SaveBodyParser(private val input: InputStream) : SatisfactorySaveParser(in
         }
     }
 
-    private fun parseMapPropertyValue(valueType: String) : MapProperty.MapPropertyValue {
+    private fun parseMapPropertyValue(valueType: String): MapProperty.MapPropertyValue {
         return when (valueType) {
             "ByteProperty" -> MapProperty.ByteMapValue(parseByte())
             "IntProperty" -> MapProperty.IntMapValue(parseInt())
@@ -598,11 +605,23 @@ class SaveBodyParser(private val input: InputStream) : SatisfactorySaveParser(in
 
         parseUInt32()
         val name = parseString()
-        val flag = parseUInt32() == 1u
-        parseUInt32()
-        val type = parseString()
-        val size = parseUInt32()
-        val elements = parsePropertyList()
+        val flag: Boolean
+        val type: String
+        val size: UInt
+
+        if (name.isNotEmpty()) {
+            flag = parseUInt32() == 1u
+            parseUInt32()
+            type = parseString()
+            size = parseUInt32()
+        } else {
+            flag = false
+            type = ""
+            size = parseUInt32()
+        }
+        val elements = if (size > 0u)
+            parsePropertyList()
+        else listOf()
 
         if (elements.size != size.toInt()) {
             throw Error()
@@ -824,11 +843,13 @@ class SaveBodyParser(private val input: InputStream) : SatisfactorySaveParser(in
             val elements: MutableList<Vector3<Vector3<ULong>>> = mutableListOf()
 
             for (j in 1u..elementCount)
-                elements.add(Triple(
-                    Triple(parseUInt64(), parseUInt64(), parseUInt64()),
-                    Triple(parseUInt64(), parseUInt64(), parseUInt64()),
-                    Triple(parseUInt64(), parseUInt64(), parseUInt64()),
-                ))
+                elements.add(
+                    Triple(
+                        Triple(parseUInt64(), parseUInt64(), parseUInt64()),
+                        Triple(parseUInt64(), parseUInt64(), parseUInt64()),
+                        Triple(parseUInt64(), parseUInt64(), parseUInt64()),
+                    )
+                )
 
             parseUInt32()
             parseUInt32()
