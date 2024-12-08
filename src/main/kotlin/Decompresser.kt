@@ -4,7 +4,7 @@ import java.util.zip.InflaterInputStream
 
 fun getDecompresserStream(compressedBodies: List<CompressedSaveFileBody>): InflaterInputStream {
     val compressedConcatenatedBody = compressedBodies
-        .flatMap { body -> body.bytes }
+        .flatMap(CompressedSaveFileBody::bytes)
         .toByteArray()
 
     val inputStream = ByteArrayInputStream(compressedConcatenatedBody)

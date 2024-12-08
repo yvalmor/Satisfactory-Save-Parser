@@ -1,6 +1,5 @@
 import data.CompressedSaveFileBody
 import data.SaveFileBody
-import data.SaveFileHeader
 import kotlinx.cli.ArgParser
 import kotlinx.cli.ArgType
 import kotlinx.cli.required
@@ -25,18 +24,10 @@ fun main(args: Array<String>) {
     val input = DataInputStream(FileInputStream(saveFile))
 
     val saveParser = SaveFileParser(input)
-    val saveHeader = SaveFileHeader.parseHeader(saveParser)
-    val compressedBodies: MutableList<CompressedSaveFileBody> = mutableListOf()
+    val parsedFile = saveParser.parseSaveFile()
 
-    while (input.available() > 0) {
-        compressedBodies.add(
-            CompressedSaveFileBody.parseCompressedBody(saveParser)
-        )
-    }
-
-    val decompresserStream = getDecompresserStream(compressedBodies)
-    compressedBodies.removeAll(compressedBodies)
+    val decompresserStream = getDecompresserStream(parsedFile.compressedBody)
 
     val saveBodyParser = SaveBodyParser(decompresserStream)
-    SaveFileBody.parseCompressedBody(saveBodyParser)
+    val saveBody = saveBodyParser.parseSaveBody()
 }
